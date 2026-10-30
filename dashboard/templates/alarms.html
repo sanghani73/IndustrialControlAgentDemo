@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Alarms — Industrial Control Agent{% endblock %}
+
+{% block content %}
+<h5 class="mb-3"><i class="bi bi-exclamation-triangle me-2"></i>Correlated Alarm Groups</h5>
+
+<div id="alarms-container">
+    <div class="text-muted text-center py-5">Loading...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function refreshAlarms() {
+    const groups = await fetchJSON('/api/alarms');
+    const container = document.getElementById('alarms-container');
+
+    if (!groups || groups.length === 0) {
+        container.innerHTML = '<div class="text-muted text-center py-5">No correlated alarm groups. System is nominal.</div>';
+        return;
+    }
+
+    container.innerHTML = groups.map(g => `
+        <div class="card mb-3 ${g.status === 'pending_remediation' ? 'border-danger' : ''}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="badge ${severityBadgeClass(g.highest_severity)} me-2">${g.highest_severity}</span>
+                    <span class="badge ${g.status === 'pending_remediation' ? 'bg-danger' : 'bg-secondary'} me-2">${g.status}</span>
+                    <strong>${g.group_id}</strong>
+                </div>
+                <small class="text-muted">${formatTime(g.created_at)}</small>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Area:</strong> ${g.area} / ${g.subsystem}</p>
+                        <p class="mb-1"><strong>Batch:</strong> ${g.batch_name}</p>
+                        <p class="mb-1"><strong>Tags:</strong> ${(g.tags_involved || []).join(', ')}</p>
+                        <p class="mb-1"><strong>Alarm Count:</strong> ${g.alarm_count}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Constituent Alarms</h6>
+                        ${(g.alarm_events || []).map(e => `
+                            <div class="p-2 bg-body-secondary rounded mb-1">
+                                <small><i class="bi bi-bell-fill text-danger me-1"></i>${e}</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ${g.consolidated_telemetry ? `
+                    <div class="mt-2">
+                        <h6>Telemetry Snapshot</h6>
+                        <div class="row">
+                            ${Object.entries(g.consolidated_telemetry).map(([k, v]) => `
+                                <div class="col-md-3 mb-1">
+                                    <small class="text-muted">${k.replace(/_/g, ' ')}</small><br>
+                                    <strong>${typeof v === 'number' ? v.toFixed(2) : v}</strong>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+refreshAlarms();
+setInterval(refreshAlarms, 5000);
+</script>
+{% endblock %}

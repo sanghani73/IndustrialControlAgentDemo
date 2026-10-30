@@ -1,0 +1,43 @@
+# --- Secrets & local config ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Claude Code local artifacts ---
+.claude/
+CLAUDE.md
+
+# --- Project overview / spec / summary (not for repo) ---
+PROJECT_SUMMARY.md
+DEMO_GUIDE.md
+Autonomous Industrial Control Agent Spec.md
+UNILEVER_SOLUTION_OVERVIEW.md
+
+# --- Logs / runtime artifacts ---
+*.log
+logs/

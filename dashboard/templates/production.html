@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Production — Industrial Control Agent{% endblock %}
+
+{% block content %}
+<h5 class="mb-3"><i class="bi bi-bar-chart-line me-2"></i>Production Plan vs Actual</h5>
+
+<div id="production-container">
+    <div class="text-muted text-center py-5">Loading...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deviationClass(minutes) {
+    if (minutes <= 5) return 'text-success';
+    if (minutes <= 10) return 'text-warning';
+    return 'text-danger';
+}
+
+function statusIcon(status) {
+    switch(status) {
+        case 'running': return '<i class="bi bi-play-circle-fill text-success"></i>';
+        case 'completed': return '<i class="bi bi-check-circle-fill text-success"></i>';
+        case 'held': return '<i class="bi bi-pause-circle-fill text-warning"></i>';
+        case 'pending': return '<i class="bi bi-clock text-muted"></i>';
+        case 'not_started': return '<i class="bi bi-clock text-muted"></i>';
+        default: return '<i class="bi bi-question-circle text-muted"></i>';
+    }
+}
+
+async function refreshProduction() {
+    const data = await fetchJSON('/api/production');
+    const container = document.getElementById('production-container');
+
+    if (!data || !data.plan) {
+        container.innerHTML = '<div class="text-muted text-center py-5">No production plan loaded. Run seed_all.py first.</div>';
+        return;
+    }
+
+    const plan = data.plan;
+    const kpis = plan.shift_kpis || {};
+
+    container.innerHTML = `
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>${plan.plan_id}</strong> &middot; ${plan.area} &middot; Shift: ${plan.shift}
+            </div>
+            <div class="card-body">
+                <div class="row text-center mb-3">
+                    <div class="col-md-4">
+                        <div class="fs-4 fw-bold">${kpis.target_batches || '—'}</div>
+                        <small class="text-muted">Target Batches</small>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fs-4 fw-bold">${kpis.target_output_kg ? kpis.target_output_kg.toLocaleString() + ' kg' : '—'}</div>
+                        <small class="text-muted">Target Output</small>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fs-4 fw-bold">${kpis.cip_cycles_planned || '—'}</div>
+                        <small class="text-muted">CIP Cycles Planned</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            ${(plan.planned_batches || []).map(b => `
+                <div class="col-md-4">
+                    <div class="card ${b.actual_status === 'running' && b.deviation_minutes > 10 ? 'border-danger' : b.actual_status === 'running' ? 'border-success' : ''}">
+                        <div class="card-header d-flex justify-content-between">
+                            <div>${statusIcon(b.actual_status || b.status)} <strong>${b.batch_name}</strong></div>
+                            <span class="badge bg-secondary">${b.recipe}</span>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm table-borderless mb-2">
+                                <tr><td class="text-muted">Planned Start</td><td>${formatTime(b.planned_start)}</td></tr>
+                                <tr><td class="text-muted">Planned End</td><td>${formatTime(b.planned_end)}</td></tr>
+                                <tr><td class="text-muted">Duration</td><td>${b.planned_duration_minutes} min</td></tr>
+                                <tr><td class="text-muted">Status</td><td>${b.actual_status || b.status}</td></tr>
+                                <tr>
+                                    <td class="text-muted">Deviation</td>
+                                    <td class="${deviationClass(Math.abs(b.deviation_minutes || 0))}">
+                                        ${b.deviation_minutes > 0 ? '+' : ''}${(b.deviation_minutes || 0).toFixed ? (b.deviation_minutes).toFixed(1) : b.deviation_minutes} min
+                                    </td>
+                                </tr>
+                                ${b.projected_finish_at ? `
+                                <tr>
+                                    <td class="text-muted">Projected Finish</td>
+                                    <td class="${deviationClass(Math.abs(b.deviation_minutes || 0))}">
+                                        ${formatTime(b.projected_finish_at)}
+                                    </td>
+                                </tr>
+                                ` : ''}
+                            </table>
+                            ${(b.delays && b.delays.length > 0) ? (() => {
+                                const openDelays = b.delays.filter(d => !d.resolved_at);
+                                const headerClass = openDelays.length > 0 ? 'text-danger' : 'text-muted';
+                                const headerText = openDelays.length > 0 ? 'Delays' : 'Delays (resolved)';
+                                return `
+                                    <h6 class="${headerClass}">${headerText}</h6>
+                                    ${b.delays.map(d => {
+                                        const resolved = Boolean(d.resolved_at);
+                                        const durationLabel = d.duration_minutes != null
+                                            ? `${d.duration_minutes} min`
+                                            : (resolved ? 'resolved' : 'ongoing');
+                                        const rowClass = resolved ? 'text-muted' : '';
+                                        const icon = resolved
+                                            ? '<i class="bi bi-check-circle text-success me-1"></i>'
+                                            : '<i class="bi bi-exclamation-circle text-warning me-1"></i>';
+                                        return `
+                                            <div class="p-2 bg-body-secondary rounded mb-1 ${rowClass}">
+                                                <small>${icon}<strong>${d.delay_type}</strong>: ${d.cause} (${durationLabel})</small>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                `;
+                            })() : ''}
+                            ${(b.material_requirements && b.material_requirements.length > 0) ? `
+                                <h6 class="mt-2">Materials</h6>
+                                ${b.material_requirements.map(m => `
+                                    <small class="d-block">${m.material}: ${m.quantity_kg} kg from ${m.source_tank}</small>
+                                `).join('')}
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+refreshProduction();
+setInterval(refreshProduction, 5000);
+</script>
+{% endblock %}

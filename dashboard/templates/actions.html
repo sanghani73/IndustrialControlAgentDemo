@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Actions — Industrial Control Agent{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Action Queue</h5>
+    <div class="btn-group" role="group">
+        <button class="btn btn-sm btn-outline-secondary active" data-filter="all">All</button>
+        <button class="btn btn-sm btn-outline-warning" data-filter="proposed">Pending</button>
+        <button class="btn btn-sm btn-outline-success" data-filter="completed">Completed</button>
+        <button class="btn btn-sm btn-outline-danger" data-filter="rejected">Rejected</button>
+    </div>
+</div>
+
+<div id="actions-container">
+    <div class="text-muted text-center py-5">Loading...</div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reject Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Reason for rejection:</label>
+                <textarea id="reject-reason" class="form-control" rows="3" placeholder="Describe why this action should not be executed..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-reject-btn">Reject</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFilter = 'all';
+let rejectActionId = null;
+
+document.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        refreshActions();
+    });
+});
+
+document.getElementById('confirm-reject-btn').addEventListener('click', async () => {
+    if (!rejectActionId) return;
+    const reason = document.getElementById('reject-reason').value;
+    await fetch(`/api/actions/${rejectActionId}/reject`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({reason})
+    });
+    bootstrap.Modal.getInstance(document.getElementById('rejectModal')).hide();
+    document.getElementById('reject-reason').value = '';
+    rejectActionId = null;
+    refreshActions();
+});
+
+window.approveAction = async function(actionId) {
+    const btn = document.querySelector(`[data-approve="${actionId}"]`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Approving...'; }
+    await fetch(`/api/actions/${actionId}/approve`, {method: 'POST'});
+    refreshActions();
+};
+
+window.rejectAction = function(actionId) {
+    rejectActionId = actionId;
+    new bootstrap.Modal(document.getElementById('rejectModal')).show();
+};
+
+async function refreshActions() {
+    const url = currentFilter === 'all' ? '/api/actions' : `/api/actions?status=${currentFilter}`;
+    const actions = await fetchJSON(url);
+    const container = document.getElementById('actions-container');
+
+    if (!actions || actions.length === 0) {
+        container.innerHTML = '<div class="text-muted text-center py-5">No actions found.</div>';
+        return;
+    }
+
+    container.innerHTML = actions.map(a => `
+        <div class="card mb-3 action-card ${a.status === 'proposed' ? 'border-warning' : ''}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="badge ${statusBadgeClass(a.status)} me-2">${a.status.toUpperCase()}</span>
+                    <span class="badge ${severityBadgeClass(a.severity)} me-2">${a.severity}</span>
+                    <strong>${a.action_id}</strong>
+                </div>
+                <small class="text-muted">${formatTime(a.created_at)}</small>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="mb-2"><strong>Batch:</strong> ${a.batch_name} &middot;
+                            <strong>Area:</strong> ${a.area} / ${a.subsystem}</p>
+                        <p class="mb-2"><strong>SOP:</strong> ${a.sop_applied}</p>
+                        <p class="mb-2"><strong>Diagnosis:</strong> ${a.diagnosis}</p>
+                        <p class="mb-2"><strong>Justification:</strong> ${a.operational_justification}</p>
+                        ${a.source_alarms ? `<p class="mb-2"><strong>Source Alarms:</strong> ${a.source_alarms.join(', ')}</p>` : ''}
+                        ${a.historical_context ? `
+                            <div class="mt-2 p-2 bg-body-secondary rounded">
+                                <small><strong>Historical Context:</strong>
+                                ${a.historical_context.similar_incidents_found} similar incidents found.
+                                Most recent: ${a.historical_context.most_recent || 'N/A'}.
+                                Typical resolution: ${a.historical_context.typical_resolution || 'N/A'}.
+                                Avg resolution time: ${a.historical_context.avg_resolution_time_seconds || 'N/A'}s</small>
+                            </div>
+                        ` : ''}
+                        ${a.rejected_reason ? `<p class="text-danger mt-2"><strong>Rejection reason:</strong> ${a.rejected_reason}</p>` : ''}
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Setpoint Changes</h6>
+                        ${(a.setpoint_changes || []).map(s => `
+                            <div class="setpoint-card mb-2 p-2 bg-body-secondary rounded">
+                                <div><strong>${s.parameter}</strong></div>
+                                <div>${s.current_value} ${s.unit} &rarr; <span class="text-success">${s.target_value} ${s.unit}</span></div>
+                                <small class="text-muted">${s.sop_reference}</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+            ${a.status === 'proposed' ? `
+                <div class="card-footer d-flex gap-2 justify-content-end">
+                    <button class="btn btn-success btn-sm" data-approve="${a.action_id}" onclick="approveAction('${a.action_id}')">
+                        <i class="bi bi-check-lg me-1"></i>Approve & Execute
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="rejectAction('${a.action_id}')">
+                        <i class="bi bi-x-lg me-1"></i>Reject
+                    </button>
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
+}
+
+refreshActions();
+setInterval(refreshActions, 5000);
+</script>
+{% endblock %}

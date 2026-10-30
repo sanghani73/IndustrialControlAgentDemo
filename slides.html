@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autonomous Industrial Control Agent — MongoDB Atlas + LLM</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+
+  <style>
+    :root {
+      --mdb-green: #00ED64;
+      --mdb-leaf: #13AA52;
+      --mdb-forest: #023430;
+      --mdb-slate: #001E2B;
+      --mdb-ink: #E3FCF7;
+      --mdb-dim: #889397;
+      --mdb-amber: #FFC010;
+      --mdb-red: #DB3030;
+    }
+
+    .reveal {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--mdb-ink);
+    }
+
+    body { background: var(--mdb-slate); }
+    .reveal .slides { text-align: left; }
+
+    .reveal section { background: transparent; }
+
+    .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+      color: #FFFFFF;
+      text-transform: none;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .reveal h1 { font-size: 2.1em; line-height: 1.1; margin-bottom: 0.3em; }
+    .reveal h2 { font-size: 1.35em; margin-bottom: 0.4em; }
+    .reveal h3 { font-size: 1em; color: var(--mdb-green); margin-bottom: 0.3em; }
+
+    .reveal p, .reveal li { font-size: 0.62em; line-height: 1.45; color: var(--mdb-ink); }
+    .reveal li { margin: 0.2em 0; }
+
+    .reveal section {
+      height: 100%;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--mdb-leaf) transparent;
+    }
+    .reveal section::-webkit-scrollbar { width: 6px; }
+    .reveal section::-webkit-scrollbar-thumb { background: var(--mdb-leaf); border-radius: 3px; }
+    .reveal section::-webkit-scrollbar-track { background: transparent; }
+    .reveal strong { color: var(--mdb-green); font-weight: 600; }
+    .reveal em { color: var(--mdb-amber); font-style: normal; }
+
+    .reveal code {
+      background: rgba(0,237,100,0.08);
+      color: var(--mdb-green);
+      padding: 0.05em 0.3em;
+      border-radius: 3px;
+      font-size: 0.9em;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .reveal pre { font-size: 0.4em; box-shadow: none; margin: 0.4em 0; }
+    .reveal pre code {
+      background: rgba(0,0,0,0.35);
+      color: var(--mdb-ink);
+      padding: 0.8em 1em;
+      border-radius: 6px;
+      border-left: 3px solid var(--mdb-green);
+      line-height: 1.4;
+    }
+
+    .title-slide { text-align: center !important; }
+    .title-slide h1 {
+      background: linear-gradient(90deg, var(--mdb-green), var(--mdb-ink));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-size: 2.6em;
+      margin-bottom: 0.3em;
+    }
+    .title-slide .subtitle {
+      color: var(--mdb-dim);
+      font-size: 1.1em;
+      margin-bottom: 1.5em;
+    }
+    .title-slide .stack {
+      color: var(--mdb-green);
+      font-size: 0.9em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .pill {
+      display: inline-block;
+      background: rgba(0,237,100,0.12);
+      border: 1px solid var(--mdb-leaf);
+      color: var(--mdb-green);
+      padding: 0.15em 0.6em;
+      border-radius: 999px;
+      font-size: 0.65em;
+      margin-right: 0.3em;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.2em; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1em; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.8em; align-items: stretch; }
+
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(0,237,100,0.18);
+      border-radius: 10px;
+      padding: 0.8em 0.9em;
+    }
+    .card h3 { margin-top: 0; font-size: 0.9em; line-height: 1.2; }
+    .card p { font-size: 0.6em; }
+    .card.highlight { border-color: var(--mdb-green); background: rgba(0,237,100,0.07); }
+    .card .agent-num {
+      font-size: 0.55em;
+      color: var(--mdb-dim);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+    .card ul { margin: 0.3em 0 0 0; padding-left: 1em; }
+    .card li { font-size: 0.4em; line-height: 1.35; }
+    .card li li { font-size: 0.82em; color: var(--mdb-dim); }
+    .card ul ul { padding-left: 1em; margin: 0.15em 0; }
+
+    .flow {
+      font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+      font-size: 0.42em;
+      color: var(--mdb-ink);
+      background: rgba(0,0,0,0.35);
+      padding: 0.9em 1em;
+      border-radius: 8px;
+      line-height: 1.4;
+      border-left: 3px solid var(--mdb-green);
+      white-space: pre;
+      overflow-x: auto;
+      margin: 0.5em 0 0 0;
+    }
+    .flow .arrow { color: var(--mdb-green); }
+    .flow .emph { color: var(--mdb-amber); }
+    .flow .mdb { color: var(--mdb-green); font-weight: 600; }
+
+    table.scenarios {
+      width: 100%;
+      font-size: 0.65em;
+      border-collapse: collapse;
+      margin-top: 0.6em;
+    }
+    table.scenarios th, table.scenarios td {
+      text-align: left;
+      padding: 0.5em 0.7em;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    table.scenarios th { color: var(--mdb-green); font-weight: 600; }
+    table.scenarios td { color: var(--mdb-ink); }
+    table.scenarios tr:hover td { background: rgba(0,237,100,0.05); }
+
+    .footer-note {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      font-size: 0.5em;
+      color: var(--mdb-dim);
+      text-align: center;
+    }
+
+    .big-stat {
+      font-size: 2.4em;
+      font-weight: 700;
+      color: var(--mdb-green);
+      line-height: 1;
+    }
+    .big-stat + .stat-label {
+      font-size: 0.7em;
+      color: var(--mdb-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .section-divider {
+      text-align: center;
+    }
+    .section-divider .section-kicker {
+      color: var(--mdb-green);
+      font-size: 0.7em;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      margin-bottom: 0.5em;
+    }
+    .section-divider h1 { font-size: 2.4em; }
+
+    .quote-block {
+      border-left: 4px solid var(--mdb-green);
+      padding: 0.4em 1.2em;
+      color: var(--mdb-ink);
+      font-size: 0.85em;
+      font-style: italic;
+      margin: 0.6em 0;
+    }
+
+    .reveal .slide-number { color: var(--mdb-dim); background: transparent; }
+    .reveal .progress { color: var(--mdb-green); }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- 1. Title -->
+      <section class="title-slide">
+        <div class="stack">MongoDB Atlas &nbsp;&middot;&nbsp; Voyage AI</div>
+        <br>
+        <br>
+        <h1>Autonomous Industrial<br/>Control Agent Demo</h1>
+        <br>
+        <div class="subtitle">A real-time alarm correlation, semantic SOP retrieval, and human-in-the-loop remediation for a chemical batch plant</div>
+      </section>
+
+      <!-- 2. The Problem -->
+      <section>
+        <h2>The control room problem</h2>
+        <div class="grid-2">
+          <div>
+            <p>A 24/7 batch plant generates <strong>hundreds of alarms per shift</strong>. When something goes wrong, operators face:</p>
+            <ul>
+              <li><strong>Alarm floods</strong> — the same root cause fires 3–10 individual alarms</li>
+              <li><strong>SOP sprawl</strong> — procedures scattered across binders, shared drives, PDFs</li>
+              <li><strong>Lost tribal knowledge</strong> — "what did we do last time?" lives in people's heads</li>
+              <li><strong>Time pressure</strong> — thermal excursions, cavitation, dosing faults compound in seconds</li>
+            </ul>
+          </div>
+          <div class="card highlight">
+            <h3>The ask</h3>
+            <p>Turn plant data into real-time situational awareness: group related alarms, surface the right SOP, remember how operators resolved it before, and propose a <em>structured</em> remediation — with a human still in control.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. The four agents -->
+      <section>
+        <h2>Our Demo: Four processes, one knowledge layer</h2>
+        <div class="grid-4">
+          <div class="card highlight">
+            <div class="agent-num">Agent 1</div>
+            <h3>Reactive SOP Matcher</h3>
+            <ul>
+              <li>Listening for correlated high/critical alarms only</li>
+              <li>Enriches from <strong>4 data sources</strong> using semantic search and structured retrieval:
+                <ul>
+                  <!-- <li><code>equipment_registry</code> — ranges, dependencies</li>
+                  <li><code>plant_sops</code> — <code>$vectorSearch</code> + autoEmbed</li>
+                  <li><code>incident_history</code> — vector + structured retrieval</li>
+                  <li><code>automation_policies</code> — auto vs HITL per action type</li> -->
+                  <li><code>equipment_registry</code></li>
+                  <li><code>plant_sops</code></li>
+                  <li><code>incident_history</code></li>
+                  <li><code>automation_policies</code></li>
+                </ul>
+              </li>
+              <li>Calls the LLM with <code>tool_use</code> → structured action plan (not free text)</li>
+              <li>Writes to <code>action_queue</code> with per-policy approval mode</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="agent-num">Agent 2</div>
+            <h3>Trend Analysis</h3>
+            <ul>
+              <li>Sliding-window aggregation on <code>sensor_telemetry</code> via <code>$setWindowFields</code></li>
+              <li>Rolling <code>$derivative</code> + <code>$avg</code> over 30&nbsp;s</li>
+              <li>Fires <em>predictive</em> warnings before thresholds trip</li>
+              <li>Operators get a head start on the hard alarm</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="agent-num">Agent 3</div>
+            <h3>Alarm Correlator</h3>
+            <ul>
+              <li>Change-stream on <code>plant_alarms</code></li>
+              <li>5&nbsp;s debounce by root-cause group</li>
+              <li>Equipment dependency traversal</li>
+              <li>One group → one diagnosis → one remediation</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="agent-num">Agent 4</div>
+            <h3>Production Monitor</h3>
+            <ul>
+              <li>Plan vs actual comparison every 15&nbsp;s</li>
+              <li>Deviation + projected finish, live</li>
+              <li>Closes resolved events; freezes final deviation</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. What we will demonstrate -->
+      <section>
+        <h2>What we plan to demonstrate</h2>
+        <p>Four cooperating processes on <strong>MongoDB Atlas</strong>, with an <strong>LLM</strong> as the reasoning engine and a dashboard for human approval.</p>
+        <div class="flow"><span class="emph">Telemetry Simulator</span>  <span class="arrow">──▶</span>  <span class="mdb">sensor_telemetry</span>  <span style="color:#889397;">(Time Series)</span>
+                               <span class="arrow">│</span>
+                               <span class="arrow">▼</span>
+                      Agent 2: Trend Analysis  <span class="arrow">──▶</span>  <span class="mdb">plant_alarms</span>
+
+<span class="emph">Alarm Simulator</span>        <span class="arrow">──▶</span>  <span class="mdb">plant_alarms</span>
+                               <span class="arrow">│</span>  <span style="color:#00ED64;">MongoDB Change Stream</span>
+                               <span class="arrow">▼</span>
+                      Agent 3: Correlator       <span class="arrow">──▶</span>  <span class="mdb">correlated_alarm_groups</span>
+                               <span class="arrow">│</span>  <span style="color:#00ED64;">MongoDB Change Stream</span>
+                               <span class="arrow">▼</span>
+                      (AI) Agent 1: Equipment Registry + SOP + History + Policy <span class="arrow">──▶</span> LLM  <span class="arrow">──▶</span>  <span class="mdb">action_queue</span>
+
+Agent 4: Production Monitor   <span class="arrow">──▶</span>  compares plan vs actual
+
+<span class="emph">Operator Dashboard</span>  <span class="arrow">──▶</span>  operator approves / rejects actions</div>
+      </section>
+
+      <!-- 5. Scenarios -->
+      <section>
+        <h2>Three failure scenarios, one architecture</h2>
+        <table class="scenarios">
+          <thead>
+            <tr><th>Scenario</th><th>Subsystem</th><th>Root cause</th><th>Alarms</th><th>SOP matched</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>SCN-01</strong><br/>Dosing Starvation</td>
+              <td>M3MX3/CHARGEFL</td>
+              <td>Upstream supply cavitation</td>
+              <td>Water dosing too slow + negative gradient</td>
+              <td>SOP-MIX3-4520-DOSE</td>
+            </tr>
+            <tr>
+              <td><strong>SCN-02</strong><br/>Thermal Excursion</td>
+              <td>M3MX3/HEATCOOL</td>
+              <td>Exothermic runaway + cooling-valve fault</td>
+              <td>Temp high + valve readback low</td>
+              <td>SOP-MIX3-4521-THERM</td>
+            </tr>
+            <tr>
+              <td><strong>SCN-03</strong><br/>CIP Cavitation</td>
+              <td>M3CIP8</td>
+              <td>Air entrainment + clogged strainer</td>
+              <td>CIP flow low + pressure low</td>
+              <td>SOP-MIX3-9031-CIP</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin-top: 1.2em; font-size: 0.8em;">New scenarios are added by <strong>writing documents</strong> — new SOPs, new alarm definitions, new equipment entries. The agent code stays the same.</p>
+      </section>
+
+      <!-- 6. Human in the loop -->
+      <section>
+        <h2>Human-in-the-loop, by data</h2>
+        <div class="grid-2">
+          <div>
+            <p>Every proposed setpoint change hits the <code>action_queue</code> with a state machine:</p>
+            <p style="font-family: monospace; font-size: 0.85em; color: var(--mdb-green);">proposed → approved → executing → completed</p>
+            <p>The <code>automation_policies</code> collection decides whether an action runs autonomously or needs sign-off — <strong>per action type, per area, per subsystem</strong>.</p>
+            <ul>
+              <li><strong>Emergency steam shutoff</strong> → autonomous (waiting <em>is</em> the risk)</li>
+              <li><strong>Pump speed change</strong> → human approval</li>
+              <li><strong>Valve override</strong> → human approval</li>
+            </ul>
+            <p>Trust is dialled up by <strong>editing data</strong>, not by shipping new agent code.</p>
+          </div>
+          <div class="card highlight">
+            <h3>What the operator sees</h3>
+            <ul>
+              <li>Diagnosis in plain language</li>
+              <li>Setpoint changes with SOP step references</li>
+              <li>Historical context ("last 2 times, resolved in ~90s")</li>
+              <li>Severity + confidence</li>
+              <li>One click: <strong>Approve &amp; Execute</strong> or <strong>Reject</strong></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. Impact of the demo -->
+      <section>
+        <h2>What this unlocks</h2>
+        <div class="grid-3">
+          <div class="card">
+            <div class="big-stat">1</div>
+            <div class="stat-label">Diagnosis per root cause</div>
+            <p style="font-size: 0.72em; margin-top: 0.6em;">Instead of 3–10 individual alarms, the operator sees one correlated group with one SOP and one proposed action.</p>
+          </div>
+          <div class="card">
+            <div class="big-stat">0</div>
+            <div class="stat-label">Separate systems to run</div>
+            <p style="font-size: 0.72em; margin-top: 0.6em;">Time series, vector search, event streaming, and documents live in a single Atlas cluster.</p>
+          </div>
+          <div class="card">
+            <div class="big-stat">∞</div>
+            <div class="stat-label">Scenarios addable by data</div>
+            <p style="font-size: 0.72em; margin-top: 0.6em;">New faults, new equipment, new sites — all onboarded by writing documents, not code.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. SECTION DIVIDER — Why MongoDB -->
+      <section class="section-divider">
+        <div class="section-kicker">Section Two</div>
+        <h1>Why MongoDB Atlas</h1>
+        <p style="color: var(--mdb-dim); margin-top: 1em;">One platform. Time series, vectors, change streams, documents — no stitching.</p>
+      </section>
+
+      <!-- 9. Native Time Series -->
+      <section>
+        <h2>Native Time Series collections</h2>
+        <div class="grid-2">
+          <div>
+            <p>Plant telemetry is <em>the</em> canonical time-series workload — thousands of tags at 1–5s granularity, 24/7.</p>
+            <ul>
+              <li><strong>Purpose-built storage</strong> — columnar compression per time bucket; 10×+ smaller than row-oriented</li>
+              <li><strong>Automatic bucketing</strong> — no app-side rollups to maintain</li>
+              <li><strong>Window aggregations</strong> — <code>$setWindowFields</code> for sliding-window trend detection</li>
+              <li><strong>TTL &amp; tiering</strong> — hot/warm/cold lifecycle out of the box</li>
+              <li><strong>Same query surface</strong> — same drivers, same aggregation framework, same cluster</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-javascript">db.createCollection(
+  "sensor_telemetry",
+  { timeseries: {
+      timeField: "ts",
+      metaField: "tag",
+      granularity: "seconds" } }
+)
+
+// Agent 2's drift detection
+db.sensor_telemetry.aggregate([
+  { $match: { tag: "M3MX3.CHARGEFL",
+              ts: { $gte: windowStart }}},
+  { $setWindowFields: {
+      sortBy: { ts: 1 },
+      output: { slope: {
+        $linearFill: "$value" }}}}
+])</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. Automated Embeddings / Voyage AI -->
+      <section>
+        <h2>Automated Embeddings with Voyage AI</h2>
+        <div class="grid-2">
+          <div>
+            <p><strong>Zero client-side embedding code</strong>. Atlas calls Voyage AI's <code>voyage-4-large</code> model for you — on insert and on query.</p>
+            <ul>
+              <li><strong>No embedding service</strong> to deploy, scale, monitor, or secure</li>
+              <li><strong>No dimension / model-version drift</strong> — Atlas keeps the index in sync</li>
+              <li><strong>Query with plain text</strong> — <code>{"text": "dosing flow collapsing"}</code>, Atlas embeds it on the fly</li>
+              <li><strong>Best-in-class retrieval</strong> — Voyage models consistently top MTEB benchmarks for enterprise RAG</li>
+              <li><strong>Same cluster, same auth</strong> — vectors live beside the operational data they describe</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-javascript">// Index definition — one block, no services
+{
+  "fields": [{
+    "type": "vector",
+    "path": "content_embedding",
+    "model": "voyage-4-large",
+    "modality": "text",
+    "autoEmbed": true
+  }]
+}
+
+// Query from Agent 1 — plain text, no vectors
+db.plant_sops.aggregate([{
+  $vectorSearch: {
+    index: "sop_auto_vector_index",
+    path: "content_embedding",
+    query: { text: "water dosing starvation,
+                    flow collapsing, valve
+                    opening to compensate" },
+    numCandidates: 20,
+    limit: 3
+}}])</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- 11. Change Streams -->
+      <section>
+        <h2>Change Streams — the database <em>is</em> the event bus</h2>
+        <div class="grid-2">
+          <div>
+            <p>Agents react to new alarms and groups in <strong>real time</strong>, with no Kafka, no RabbitMQ, no polling loop.</p>
+            <ul>
+              <li>Agent 3 watches <code>plant_alarms</code></li>
+              <li>Agent 1 watches <code>correlated_alarm_groups</code></li>
+              <li>Resumable tokens guarantee <strong>at-least-once</strong> delivery across restarts</li>
+              <li>Filtered server-side with <code>$match</code> — only the events each agent cares about</li>
+              <li>One less piece of infrastructure to run, secure, and page on</li>
+            </ul>
+          </div>
+          <div>
+            <pre><code class="language-python">pipeline = [{"$match": {
+    "operationType": "insert"
+}}]
+with db.plant_alarms.watch(pipeline) as stream:
+    for change in stream:
+        alarm = change["fullDocument"]
+        correlate(alarm)   # debounced
+        # resume token stored for crash safety</code></pre>
+            <div class="quote-block">
+              "MongoDB is both the database and the event bus."
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 12. Flexible document model + resilience + scale -->
+      <section>
+        <h2>Flexible model. Operational resilience. Scale.</h2>
+        <div class="grid-3">
+          <div class="card">
+            <h3>One shape per purpose</h3>
+            <ul>
+              <li>Time-series telemetry</li>
+              <li>Equipment hierarchies with dependency chains</li>
+              <li>SOPs with embedded corrective steps</li>
+              <li>Incident narratives + structured action logs</li>
+              <li>Nested production plans</li>
+              <li>Action-queue state machine</li>
+            </ul>
+            <p style="font-size:0.65em; color: var(--mdb-dim);">11 collections, one database, no ORM gymnastics.</p>
+          </div>
+          <div class="card">
+            <h3>Resilient by default</h3>
+            <ul>
+              <li>Replica sets — automatic failover, no app downtime</li>
+              <li>Multi-region clusters for geo-redundancy</li>
+              <li>Continuous backup &amp; point-in-time recovery</li>
+              <li>Encryption at rest, in transit, in use (Queryable Encryption)</li>
+              <li>Managed by Atlas — SOC 2, ISO 27001, HIPAA, PCI</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Scale when the plant does</h3>
+            <ul>
+              <li>Horizontal sharding on tag or site</li>
+              <li>Online index builds — no maintenance windows</li>
+              <li>Workload isolation with analytics nodes</li>
+              <li>Autoscaling compute and storage</li>
+              <li>From one line to a global fleet without re-platforming</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 13. One platform summary -->
+      <section>
+        <h2>One cluster, every capability this agent needs</h2>
+        <div class="grid-4">
+          <div class="card highlight">
+            <h3>Time series</h3>
+            <p style="font-size:0.7em;">High-frequency telemetry at 1–5s granularity with columnar compression and window aggregations.</p>
+          </div>
+          <div class="card highlight">
+            <h3>Vector search</h3>
+            <p style="font-size:0.7em;">Semantic retrieval over SOPs &amp; incidents with auto-embedding via Voyage AI — no client-side ML stack.</p>
+          </div>
+          <div class="card highlight">
+            <h3>Change streams</h3>
+            <p style="font-size:0.7em;">Real-time event-driven agent coordination with resumable, at-least-once delivery.</p>
+          </div>
+          <div class="card highlight">
+            <h3>Document model</h3>
+            <p style="font-size:0.7em;">Equipment, policies, plans, state machines — each shaped for its purpose, all in one query surface.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 14. Thanks -->
+      <section class="title-slide">
+        <div class="stack">Thank you</div>
+        <br>
+        <br>
+        <h1>Questions?</h1>
+        <br>
+        <br>
+        <div class="subtitle">Autonomous Industrial Control Agent</div>
+        <div class="stack">Built on MongoDB Atlas</div>
+        <br>
+        <p style="font-size:0.7em;">For more information, visit <a href="https://www.mongodb.com/atlas" target="_blank">MongoDB Atlas</a>.</p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: 'c/t',
+      transition: 'fade',
+      transitionSpeed: 'fast',
+      backgroundTransition: 'fade',
+      controls: true,
+      progress: true,
+      center: false,
+      width: 1400,
+      height: 820,
+      margin: 0.04,
+      minScale: 0.2,
+      maxScale: 2.0,
+      plugins: [RevealHighlight, RevealNotes]
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Overview — Industrial Control Agent{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="stat-icon text-danger"><i class="bi bi-exclamation-octagon"></i></div>
+                <div class="stat-value" id="stat-alarms">—</div>
+                <div class="stat-label">Active Alarm Groups</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="stat-icon text-warning"><i class="bi bi-hourglass-split"></i></div>
+                <div class="stat-value" id="stat-pending">—</div>
+                <div class="stat-label">Pending Approvals</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="stat-icon text-success"><i class="bi bi-check-circle"></i></div>
+                <div class="stat-value" id="stat-completed">—</div>
+                <div class="stat-label">Completed Actions</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="stat-icon text-info"><i class="bi bi-box-seam"></i></div>
+                <div class="stat-value" id="stat-batches">—</div>
+                <div class="stat-label">Running Batches</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Recent Actions</h6>
+                <a href="/actions" class="btn btn-sm btn-outline-secondary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div id="recent-actions-list" class="list-group list-group-flush">
+                    <div class="list-group-item text-muted text-center py-4">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Active Alarm Groups</h6>
+                <a href="/alarms" class="btn btn-sm btn-outline-secondary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div id="active-alarms-list" class="list-group list-group-flush">
+                    <div class="list-group-item text-muted text-center py-4">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function refreshOverview() {
+    const stats = await fetchJSON('/api/stats');
+    if (stats) {
+        document.getElementById('stat-alarms').textContent = stats.active_alarm_groups;
+        document.getElementById('stat-pending').textContent = stats.pending_actions;
+        document.getElementById('stat-completed').textContent = stats.completed_actions;
+        document.getElementById('stat-batches').textContent = stats.running_batches;
+    }
+
+    const actions = await fetchJSON('/api/actions');
+    const actionsEl = document.getElementById('recent-actions-list');
+    if (actions && actions.length > 0) {
+        actionsEl.innerHTML = actions.slice(0, 10).map(a => `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <span class="badge ${statusBadgeClass(a.status)} me-2">${a.status}</span>
+                        <strong>${a.sop_applied}</strong> — ${a.batch_name}
+                    </div>
+                    <small class="text-muted">${formatTime(a.created_at)}</small>
+                </div>
+                <small class="text-muted d-block mt-1">${truncate(a.diagnosis, 120)}</small>
+            </div>
+        `).join('');
+    } else {
+        actionsEl.innerHTML = '<div class="list-group-item text-muted text-center py-4">No actions yet. Run a scenario to trigger the agents.</div>';
+    }
+
+    const alarms = await fetchJSON('/api/alarms');
+    const alarmsEl = document.getElementById('active-alarms-list');
+    if (alarms && alarms.length > 0) {
+        alarmsEl.innerHTML = alarms.slice(0, 8).map(g => `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <span class="badge ${severityBadgeClass(g.highest_severity)} me-1">${g.highest_severity}</span>
+                        <strong>${g.subsystem}</strong>
+                    </div>
+                    <span class="badge bg-secondary">${g.alarm_count} alarms</span>
+                </div>
+                <small class="text-muted d-block mt-1">${g.alarm_events.join(', ')}</small>
+            </div>
+        `).join('');
+    } else {
+        alarmsEl.innerHTML = '<div class="list-group-item text-muted text-center py-4">No alarm groups. System nominal.</div>';
+    }
+}
+
+refreshOverview();
+setInterval(refreshOverview, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,46 @@
+body {
+    font-size: 0.9rem;
+}
+
+.stat-card {
+    transition: transform 0.15s ease;
+}
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+.stat-icon {
+    font-size: 1.8rem;
+    margin-bottom: 0.3rem;
+}
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.stat-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+}
+
+.action-card.border-warning {
+    border-width: 2px !important;
+}
+
+.setpoint-card {
+    font-size: 0.85rem;
+}
+
+.navbar-brand {
+    font-weight: 600;
+}
+
+.card-header {
+    font-size: 0.85rem;
+}
+
+.badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+}
